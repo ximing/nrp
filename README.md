@@ -1,10 +1,6 @@
+![build workflow](https://github.com/ximing/nrp/actions/workflows/build.yml/badge.svg)
+
 # Quick Start
-
-## Install
-
-```bash
-npm i -g @nrpjs/server @nrpjs/client
-```
 
 ## Usage
 
@@ -18,6 +14,7 @@ vhost_http_port: 9001
 ```
 
 ```bash
+npm i -g @nrpjs/server
 nrps -c nrps.yaml
 ```
 
@@ -36,5 +33,6 @@ http:
 ```
 
 ```bash
+npm i -g @nrpjs/client
 nrpc -c nrpc.yaml
 ```

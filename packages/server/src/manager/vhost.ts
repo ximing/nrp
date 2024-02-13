@@ -52,7 +52,7 @@ export class VhostManager {
   handleHttp = (req: Request, res: Response) => {
     const host = req.headers.host;
     if (host) {
-      log.error(`vhost request host: ${host}`);
+      log.info(`vhost request host: ${host}`);
       const nfrClient = this.getNFRClient(host);
       if (nfrClient) {
         // 将HTTP请求封装成帧，传递给nrp client

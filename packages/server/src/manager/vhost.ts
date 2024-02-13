@@ -3,7 +3,9 @@ import { Request, Response } from 'express';
 import { Buffer } from 'buffer';
 import { ClientHttpSetting, Frame, FrameFlag, FrameType } from '@nrpjs/shared';
 import { NrpServer } from '../main';
-import { log } from '../logger';
+import { logGen } from '../logger';
+
+const log = logGen('[vhost] ');
 
 export class VhostManager {
   constructor(private nrpServer: NrpServer) {}
@@ -49,10 +51,13 @@ export class VhostManager {
     return streamId;
   }
 
-  handleHttp = (req: Request, res: Response) => {
+  /*
+   * 处理HTTP请求，将请求转发给nfr client
+   * */
+  handleHttpRequest = (req: Request, res: Response) => {
     const host = req.headers.host;
     if (host) {
-      log.info(`vhost request host: ${host}`);
+      log.info(`request host: ${host}`);
       const nfrClient = this.getNFRClient(host);
       if (nfrClient) {
         // 将HTTP请求封装成帧，传递给nrp client
@@ -117,10 +122,11 @@ export class VhostManager {
       if (res) {
         if (frame.isDataEnd) {
           res.end();
-          log.info(`vhost response end`);
+          log.info(`streamId: ${frame.streamId} receive data end`);
           // 处理完成，关闭stream
           this.closeStream(frame.streamId);
         } else {
+          log.info(`streamId: ${frame.streamId} receive data frame ${frame.length} bytes`);
           res.write(frame.payload);
         }
       }

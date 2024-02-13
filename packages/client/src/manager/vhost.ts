@@ -57,7 +57,7 @@ export class VhostClient {
               ).encode(),
             );
             res.on('data', (chunk) => {
-              log.info('http request chunk');
+              log.info('http.request response chunk');
               nrpc.write(
                 new Frame(FrameType.DATA, FrameFlag.PADDED, frame.streamId, chunk).encode(),
               );

@@ -45,8 +45,9 @@ export class NrpServer {
     this.nrps = net.createServer((nrpClient) => {
       log.info(`new client connected,${nrpClient.remoteAddress}:${nrpClient.remotePort}`);
 
-      nrpClient.on('data', (data) => {
-        this.handleStream.parse(data, nrpClient);
+      nrpClient.on('data', (chunk) => {
+        log.info(`receive nrpClient chunk`);
+        this.handleStream.parse(chunk, nrpClient);
       });
 
       // 监听关闭事件
@@ -90,7 +91,7 @@ export class NrpServer {
   private startVhost() {
     this.vhostServer = express();
     this.vhostServer.all('*', (req, res) => {
-      this.vhostManager.handleHttp(req, res);
+      this.vhostManager.handleHttpRequest(req, res);
     });
     this.vhostServer.listen(this.config.vhost_http_port, () => {
       log.info(`VHost listening on port ${this.config.vhost_http_port}`);

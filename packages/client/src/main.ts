@@ -39,7 +39,7 @@ export class NrpClient {
           ).encode(),
         );
       }
-    }, 10);
+    }, 10000);
   }
 
   handleSettings = (frame: Frame, nrpc: net.Socket) => {
@@ -66,12 +66,12 @@ export class NrpClient {
   }
 
   private connect() {
-    const client = new net.Socket();
-    client.connect(this.settings.bind_port, this.settings.bind_host, () => {
+    const nrpc = new net.Socket();
+    nrpc.connect(this.settings.bind_port, this.settings.bind_host, () => {
       log.info(`Connected to nrps ${this.settings.bind_host}:${this.settings.bind_port}`);
       this.retryCount = 0;
       // 发送数据到服务器
-      client.write(
+      nrpc.write(
         new Frame(
           FrameType.SETTINGS,
           FrameFlag.PADDED,
@@ -80,20 +80,21 @@ export class NrpClient {
         ).encode(),
       );
 
-      this.nrpc = client;
+      this.nrpc = nrpc;
     });
     // 当从服务器接收到数据时触发
-    client.on('data', (data) => {
-      this.handleStream.parse(data, client);
+    nrpc.on('data', (data) => {
+      log.info(`receive server chunk`);
+      this.handleStream.parse(data, nrpc);
     });
 
     // 当连接关闭时触发
-    client.on('close', (hadError) => {
+    nrpc.on('close', (hadError) => {
       log.info(`Connection closed hadError: ${hadError}`);
       this.nrpc = null;
     });
 
-    client.on('end', () => {
+    nrpc.on('end', () => {
       log.info('Disconnected from server');
       // 服务器正常关闭连接，可能不需要重连
       // 如果需要在正常断开后也尝试重连，请在此处调用tryReconnect()
@@ -101,9 +102,9 @@ export class NrpClient {
     });
 
     // 当发生错误时触发
-    client.on('error', (err) => {
+    nrpc.on('error', (err) => {
       log.error(err);
-      client.destroy();
+      nrpc.destroy();
     });
   }
 }

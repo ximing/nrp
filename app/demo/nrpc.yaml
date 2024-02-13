@@ -1,0 +1,13 @@
+bind_port: 9000 # FRP 服务监听的端口
+bind_host: 127.0.0.1 # FRP 服务监听的端口
+subdomain_host: delu.life:9001 # 你拥有的域名，用于子域名访问
+timeout: 1000
+retry: 3
+backoff:
+  min: 100
+  max: 1000
+  factor: 2
+http:
+  test:
+    subdomain: nrpc
+    local_port: 3000

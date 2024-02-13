@@ -1,0 +1,25 @@
+language: node_js
+node_js: 10
+before_install:
+  - openssl aes-256-cbc -K $encrypted_cd2c127773ab_key -iv $encrypted_cd2c127773ab_iv
+    -in id_rsa.enc -out ~\/.ssh/id_rsa -d
+  - chmod 600 ~/.ssh/id_rsa
+addons:
+  ssh_known_hosts: '$IP'
+cache:
+  directories:
+    - node_modules
+install:
+  - npm install
+  - cd packages/server & npm i
+script:
+  - cd packages/server & npm run build
+after_script:
+  - cd packages
+  - scp -o StrictHostKeyChecking=no -r server/  root@$IP:/root/xming/
+branches:
+  only:
+    - deploy
+env:
+  global:
+    - NODE_ENV=production

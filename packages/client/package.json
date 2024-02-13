@@ -1,0 +1,28 @@
+{
+  "name": "@nrpjs/client",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development ts-node-dev  --respawn --dedupe  --transpile-only --ignore-watch node_modules src/main.ts",
+    "build": "tsc && chmod +x dist/bin.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bin": {
+    "nrpc": "./dist/bin.js"
+  },
+  "dependencies": {
+    "yaml": "^2.3.4",
+    "yargs": "^17.7.2",
+    "@nrpjs/shared": "workspace:*",
+    "pino": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.15",
+    "@types/yargs": "^17.0.32",
+    "typescript": "^5.0.3",
+    "ts-node-dev": "^2.0.0"
+  }
+}

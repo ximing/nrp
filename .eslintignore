@@ -1,0 +1,7 @@
+node_modules
+*.json
+dist/**/*.js
+build/**/*.js
+babel/*.js
+packages/muya
+miniapp/src/libs/**/*.js

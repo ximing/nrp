@@ -1,21 +1,46 @@
 import * as net from 'net';
-import { Request, Response } from 'express';
+import * as http from 'http';
 import { Buffer } from 'buffer';
+import express, { Express, Request, Response } from 'express';
+import { WebSocket, WebSocketServer } from 'ws';
 import { ClientHttpSetting, Frame, FrameFlag, FrameType } from '@nrpjs/shared';
 import { NrpServer } from '../main';
 import { logGen } from '../logger';
+import stream from 'node:stream';
 
 const log = logGen('[vhost] ');
 
 export class VhostManager {
   constructor(private nrpServer: NrpServer) {}
+  vhostApp!: Express;
+  vhostServer!: http.Server;
+  wsServer!: WebSocketServer;
 
   private hostMap = new Map<string, net.Socket>();
-  private streamId = 0;
-  private streamMap = new Map<number, Response>();
+  private streamId = 2;
+  private responseMap = new Map<number, Response>();
+  private wsStreamMap = new Map<WebSocket, number>();
+  private streamWsMap = new Map<number, WebSocket>();
+
+  start() {
+    const app = express();
+    const server = http.createServer(app);
+    const wsServer = new WebSocketServer({ clientTracking: false, noServer: true });
+    this.vhostServer = server;
+    this.vhostApp = app;
+    this.wsServer = wsServer;
+    server.on('upgrade', this.handleWsRequest);
+    wsServer.on('connection', this.handleWsConnection);
+    app.all('*', this.handleHttpRequest);
+    // 使用创建的HTTP服务器监听端口，而不是直接使用Express的监听方法
+    server.listen(this.nrpServer.getConfig().vhost_http_port, () => {
+      log.info(`VHost listening on port ${this.nrpServer.getConfig().vhost_http_port}`);
+    });
+  }
 
   setVhost(subdomain_host: string, httpSettings: ClientHttpSetting, nfrClient: net.Socket) {
     Object.values(httpSettings).forEach((setting) => {
+      // @ts-ignore
       const { subdomain } = setting;
       const domain = `${subdomain}.${subdomain_host}`;
       this.hostMap.set(domain, nfrClient);
@@ -37,15 +62,21 @@ export class VhostManager {
   }
 
   getResponse(id: number) {
-    return this.streamMap.get(id);
+    return this.responseMap.get(id);
   }
 
   closeStream(id: number) {
     log.info(`close stream ${id}`);
-    this.streamMap.delete(id);
+    this.responseMap.delete(id);
+    const ws = this.streamWsMap.get(id);
+    if (ws) {
+      this.streamWsMap.delete(id);
+      this.wsStreamMap.delete(ws);
+    }
   }
 
   getStreamId() {
+    // TODO 取余，防止溢出
     const streamId = this.streamId;
     this.streamId = streamId + 2;
     return streamId;
@@ -57,17 +88,17 @@ export class VhostManager {
   handleHttpRequest = (req: Request, res: Response) => {
     const host = req.headers.host;
     if (host) {
-      log.info(`request host: ${host}`);
+      log.info(`handleHttpRequest request host: ${host}`);
       const nfrClient = this.getNFRClient(host);
       if (nfrClient) {
         // 将HTTP请求封装成帧，传递给nrp client
-        // TODO 取余，防止溢出
         const streamId = this.getStreamId();
-        log.info(`vhost streamId: ${streamId}`);
-        this.streamMap.set(streamId, res);
+        log.info(`handleHttpRequest vhost streamId: ${streamId}`);
+        this.responseMap.set(streamId, res);
         const headersStr = JSON.stringify({
+          type: 'http',
           method: req.method,
-          path: req.path,
+          path: req.url,
           host,
           headers: req.headers,
         });
@@ -75,7 +106,7 @@ export class VhostManager {
         nfrClient.write(
           new Frame(FrameType.HEADERS, FrameFlag.END_HEADERS, streamId, payload).encode(),
           () => {
-            log.info(`sent headers, ${headersStr}`);
+            log.info(`handleHttpRequest sent headers, ${headersStr}`);
           },
         );
         req.on('data', (chunk) => {
@@ -93,15 +124,82 @@ export class VhostManager {
         //   this.closeStream(streamId);
         // });
       } else {
-        res.status(500).send('nfrs socket not found');
+        res.status(500).send('handleHttpRequest nfrClient not found');
       }
     } else {
-      res.status(500).send('nfrs host not found');
+      res.status(500).send('handleHttpRequest host not found');
     }
   };
 
+  /*
+   * 处理websocket请求，将请求转发给nfr client
+   * */
+  handleWsRequest = (request: http.IncomingMessage, socket: stream.Duplex, head: Buffer) => {
+    socket.on('error', () => {});
+    const host = request.headers.host;
+    if (host) {
+      const nfrClient = this.getNFRClient(host);
+      if (nfrClient) {
+        const streamId = this.getStreamId();
+        const headersStr = JSON.stringify({
+          type: 'ws',
+          path: request.url,
+          host,
+          headers: request.headers,
+        });
+        const payload = Buffer.from(headersStr, 'utf8');
+        nfrClient.write(
+          new Frame(FrameType.HEADERS, FrameFlag.END_HEADERS, streamId, payload).encode(),
+        );
+        this.wsServer.handleUpgrade(request, socket, head, (ws) => {
+          // @ts-ignore
+          ws.nfrClient = nfrClient;
+          this.wsStreamMap.set(ws, streamId);
+          this.streamWsMap.set(streamId, ws);
+          this.wsServer.emit('connection', ws, request);
+        });
+      } else {
+        socket.write('HTTP/1.1 500 nfrClient not found\r\n\r\n');
+        log.error(`ws nfrClient not found`);
+        socket.destroy();
+      }
+    } else {
+      socket.write('HTTP/1.1 500 host not found\r\n\r\n');
+      log.error(`ws host not found`);
+      socket.destroy();
+    }
+  };
+
+  handleWsConnection = (ws: WebSocket) => {
+    ws.on('message', (data, isBinary) => {
+      const streamId = this.wsStreamMap.get(ws);
+      if (streamId) {
+        // @ts-ignore
+        ws.nfrClient.write(
+          new Frame(FrameType.WS_DATA, FrameFlag.PADDED, streamId, data as Buffer).encode(),
+        );
+      } else {
+        log.error('ws:message not found streamId');
+      }
+    });
+    // 监听断开连接
+    ws.on('close', () => {
+      const streamId = this.wsStreamMap.get(ws);
+      if (streamId) {
+        log.info('ws Client disconnected');
+        // 在这里执行断开连接后的清理工作
+        // @ts-ignore
+        ws.nfrClient.write(
+          new Frame(FrameType.WS_DATA, FrameFlag.END_DATA, streamId, Buffer.alloc(0)).encode(),
+        );
+      } else {
+        log.error('ws:close not found streamId');
+      }
+    });
+  };
+
   // 处理服务端
-  handleResHeaders = (frame: Frame, nrpClient: net.Socket) => {
+  handleNrpcResHeaders = (frame: Frame, nrpClient: net.Socket) => {
     if (frame.isHeaders) {
       const res = this.getResponse(frame.streamId);
       if (res) {
@@ -116,18 +214,52 @@ export class VhostManager {
     }
   };
 
-  handleResData = (frame: Frame, nrpClient: net.Socket) => {
+  // 处理nrpc传递过来的数据
+  handleNrpcResData = (frame: Frame, nrpClient: net.Socket) => {
     if (frame.isData) {
-      const res = this.getResponse(frame.streamId);
-      if (res) {
-        if (frame.isDataEnd) {
-          res.end();
-          log.info(`streamId: ${frame.streamId} receive data end`);
-          // 处理完成，关闭stream
-          this.closeStream(frame.streamId);
+      log.info(
+        `handleNrpcResData receiveData streamId: ${frame.streamId} frameType: ${frame.type} frameFlag: ${frame.flag} ${frame.isHttpData}`,
+      );
+      // 处理HTTP响应数据
+      if (frame.isHttpData) {
+        const response = this.getResponse(frame.streamId);
+        if (response) {
+          if (frame.isDataEnd) {
+            response.end();
+            log.info(`handleNrpcResData streamId: ${frame.streamId}  http receive data end`);
+            // 处理完成，关闭stream
+            this.closeStream(frame.streamId);
+          } else {
+            log.info(
+              `handleNrpcResData streamId: ${frame.streamId} http receive data frame ${frame.length} bytes`,
+            );
+            response.write(frame.payload);
+          }
         } else {
-          log.info(`streamId: ${frame.streamId} receive data frame ${frame.length} bytes`);
-          res.write(frame.payload);
+          log.error(`handleNrpcResData streamId: ${frame.streamId} not found response`);
+        }
+      } else {
+        const ws = this.streamWsMap.get(frame.streamId);
+        if (ws) {
+          if (frame.isDataEnd) {
+            log.info(`handleNrpcResData streamId: ${frame.streamId} ws receive data end`);
+            ws.close();
+            // 处理完成，关闭stream
+            this.closeStream(frame.streamId);
+          } else {
+            log.info(
+              `handleNrpcResData streamId: ${frame.streamId} ws receive data frame ${frame.length} bytes`,
+            );
+            const binaryFlag = frame.payload[0];
+            const data = frame.payload.subarray(1);
+            if (binaryFlag === 1) {
+              ws.send(data);
+            } else {
+              ws.send(data.toString('utf-8'));
+            }
+          }
+        } else {
+          log.error('handleNrpcResData not found ws');
         }
       }
     }

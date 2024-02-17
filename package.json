@@ -4,8 +4,10 @@
   "description": "null",
   "main": "index.js",
   "scripts": {
-    "dev": "chokidar 'packages/*/src/**/*.ts' -c 'npm run build || exit 0'",
-    "build": "npm run rm:dist && pnpm --filter './packages/*' run build",
+    "dev": "npm run build:dev && chokidar 'packages/*/src/**/*.ts' '!packages/web/**/*' -c 'npm run build:dev || exit 0'",
+    "build:dev": "pnpm --filter './packages/*' --filter '!./packages/web' run build",
+    "build": "npm run rm:dist && pnpm --filter './packages/*' run build && pnpm run sync:web",
+    "sync:web": "rsync -av --delete packages/web/dist/ packages/dashboard/dist/web/",
     "init": "yarn && lerna bootstrap --force-local --registry=https://registry.npm.taobao.org",
     "rm": "find . -name \"node_modules\" -type d -prune -exec rm -rf '{}' +",
     "rm:dist": "find packages/* -type d -name dist -prune -exec rm -rf '{}' +",

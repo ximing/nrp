@@ -10,4 +10,4 @@ backoff:
 http:
   test:
     subdomain: nrpc
-    local_port: 3000
+    local_port: 5173

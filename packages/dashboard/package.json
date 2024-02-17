@@ -1,5 +1,5 @@
 {
-  "name": "@nrpjs/client",
+  "name": "@nrpjs/dashboard",
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
@@ -11,19 +11,18 @@
   "author": "",
   "license": "ISC",
   "bin": {
-    "nrpc": "./dist/bin.js"
+    "nrpd": "./dist/bin.js"
   },
   "dependencies": {
-    "yaml": "^2.3.4",
-    "yargs": "^17.7.2",
-    "@nrpjs/shared": "workspace:*",
     "pino": "^8.18.0",
-    "ws": "^8.16.0"
+    "pino-pretty": "^10.3.1",
+    "http-proxy-middleware": "^2.0.6",
+    "express": "^4.17.1",
+    "express-basic-auth": "^1.2.1"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^18.19.15",
-    "@types/ws": "^8.5.10",
-    "@types/yargs": "^17.0.32",
     "typescript": "^5.0.3",
     "ts-node-dev": "^2.0.0"
   }

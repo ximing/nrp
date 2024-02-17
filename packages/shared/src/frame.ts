@@ -11,6 +11,7 @@ export enum FrameType {
   GOAWAY,
   WINDOW_UPDATE,
   CONTINUATION,
+  WS_DATA,
   // 其他帧类型可以按需添加
 }
 
@@ -73,7 +74,7 @@ export class Frame {
   }
 
   get isData() {
-    return this.type === FrameType.DATA;
+    return this.isHttpData || this.isWsData;
   }
 
   get isHeaders() {
@@ -88,12 +89,24 @@ export class Frame {
     return this.type === FrameType.PING;
   }
 
+  get isHttpData() {
+    return this.type === FrameType.DATA;
+  }
+
+  get isWsData() {
+    return this.type === FrameType.WS_DATA;
+  }
+
   get isDataEnd() {
     return this.isData && Frame.checkFlag(this.flag, FrameFlag.END_DATA);
   }
 
   static checkFlag(curFlag: number, targetFlag: FrameFlag) {
     return curFlag === targetFlag;
+  }
+
+  static checkType(curType: number, targetType: FrameType) {
+    return curType === targetType;
   }
 
   decodePayload(encode: BufferEncoding, isJson = false) {

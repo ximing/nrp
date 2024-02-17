@@ -1,5 +1,4 @@
 import * as net from 'net';
-import express, { Express } from 'express';
 import { Frame, FrameFlag, FrameType, HandleStream, NrpServerConfig } from '@nrpjs/shared';
 import { ClientManager } from './manager/client';
 import { VhostManager } from './manager/vhost';
@@ -8,7 +7,6 @@ import { log } from './logger';
 
 export class NrpServer {
   nrps!: net.Server;
-  vhostServer!: Express;
   clientManager: ClientManager;
   vhostManager: VhostManager;
 
@@ -17,6 +15,10 @@ export class NrpServer {
   constructor(private config: NrpServerConfig) {
     this.clientManager = new ClientManager(this);
     this.vhostManager = new VhostManager(this);
+  }
+
+  getConfig() {
+    return this.config;
   }
 
   handleSettings = (frame: Frame, nrpClient: net.Socket) => {
@@ -39,8 +41,8 @@ export class NrpServer {
 
   start() {
     this.handleStream.register(this.handleSettings);
-    this.handleStream.register(this.vhostManager.handleResHeaders);
-    this.handleStream.register(this.vhostManager.handleResData);
+    this.handleStream.register(this.vhostManager.handleNrpcResHeaders);
+    this.handleStream.register(this.vhostManager.handleNrpcResData);
 
     this.nrps = net.createServer((nrpClient) => {
       log.info(`new client connected,${nrpClient.remoteAddress}:${nrpClient.remotePort}`);
@@ -59,6 +61,7 @@ export class NrpServer {
           this.clientManager.rmClient(meta.id);
           this.clientManager.rmMeta(nrpClient);
         }
+        // nrp客户端断开连接，这时候，存在ws的情况需要断开ws
       });
 
       // 监听错误事件
@@ -71,7 +74,8 @@ export class NrpServer {
       // 当客户端发出 FIN 包，请求关闭连接时，会触发此事件。
       // 这是一个表明客户端想要结束连接的半关闭状态，此时服务器端仍可以发送数据，但是一旦所有数据发送完毕，连接将被关闭。
       nrpClient.on('end', () => {
-        console.log('Client disconnected');
+        const meta = this.clientManager.getMeta(nrpClient);
+        log.info(`nrpClient disconnected ${meta?.id}`);
       });
 
       // 可以选择设置超时监听器
@@ -85,16 +89,6 @@ export class NrpServer {
     this.nrps.listen(this.config.port, () => {
       log.info(`Server listening on port ${this.config.port}`);
     });
-    this.startVhost();
-  }
-
-  private startVhost() {
-    this.vhostServer = express();
-    this.vhostServer.all('*', (req, res) => {
-      this.vhostManager.handleHttpRequest(req, res);
-    });
-    this.vhostServer.listen(this.config.vhost_http_port, () => {
-      log.info(`VHost listening on port ${this.config.vhost_http_port}`);
-    });
+    this.vhostManager.start();
   }
 }

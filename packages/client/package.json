@@ -17,10 +17,12 @@
     "yaml": "^2.3.4",
     "yargs": "^17.7.2",
     "@nrpjs/shared": "workspace:*",
-    "pino": "^8.18.0"
+    "pino": "^8.18.0",
+    "ws": "^8.16.0"
   },
   "devDependencies": {
     "@types/node": "^18.19.15",
+    "@types/ws": "^8.5.10",
     "@types/yargs": "^17.0.32",
     "typescript": "^5.0.3",
     "ts-node-dev": "^2.0.0"

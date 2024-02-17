@@ -1,10 +1,26 @@
+import * as http from 'http';
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import morgan from 'morgan'; // Morgan is a popular HTTP request logger middleware for Node.js, similar to koa-logger
+import morgan from 'morgan';
+import { WebSocketServer } from 'ws';
 
 const app = express();
-const PORT = 3000;
+const server = http.createServer(app);
+const wsServer = new WebSocketServer({ clientTracking: false, noServer: true });
+server.on('upgrade', function upgrade(request, socket, head) {
+  wsServer.handleUpgrade(request, socket, head, function done(ws) {
+    wsServer.emit('connection', ws, request);
+  });
+});
+wsServer.on('connection', function connection(ws) {
+  ws.on('message', function message(data) {
+    console.log('Received message: %s', data);
+  });
+  // ws.send('You are connected to WebSocket server!');
+});
+
+const PORT = 5173;
 
 // Middleware
 app.use(express.json()); // bodyParser is now built into Express
@@ -47,6 +63,6 @@ app.get('/stream', async (req, res) => {
 });
 
 // Start the server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

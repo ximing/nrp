@@ -143,6 +143,9 @@ importers:
       multer:
         specifier: ^1.4.4
         version: 1.4.4
+      ws:
+        specifier: ^8.16.0
+        version: 8.16.0
     devDependencies:
       '@types/express':
         specifier: ^4.17.21
@@ -168,6 +171,9 @@ importers:
       '@types/node':
         specifier: ^18.19.15
         version: 18.19.15
+      '@types/ws':
+        specifier: ^8.5.10
+        version: 8.5.10
       ts-node-dev:
         specifier: ^2.0.0
         version: 2.0.0(@types/node@18.19.15)(typescript@5.3.3)
@@ -183,6 +189,9 @@ importers:
       pino:
         specifier: ^8.18.0
         version: 8.18.0
+      ws:
+        specifier: ^8.16.0
+        version: 8.16.0
       yaml:
         specifier: ^2.3.4
         version: 2.3.4
@@ -193,6 +202,9 @@ importers:
       '@types/node':
         specifier: ^18.19.15
         version: 18.19.15
+      '@types/ws':
+        specifier: ^8.5.10
+        version: 8.5.10
       '@types/yargs':
         specifier: ^17.0.32
         version: 17.0.32
@@ -254,6 +266,9 @@ importers:
       pino:
         specifier: ^8.18.0
         version: 8.18.0
+      ws:
+        specifier: ^8.16.0
+        version: 8.16.0
       yaml:
         specifier: ^2.3.4
         version: 2.3.4
@@ -267,6 +282,9 @@ importers:
       '@types/node':
         specifier: ^18.19.15
         version: 18.19.15
+      '@types/ws':
+        specifier: ^8.5.10
+        version: 8.5.10
       '@types/yargs':
         specifier: ^17.0.32
         version: 17.0.32
@@ -1711,6 +1729,12 @@ packages:
 
   /@types/strip-json-comments@0.0.30:
     resolution: {integrity: sha512-7NQmHra/JILCd1QqpSzl8+mJRc8ZHz3uDm8YV1Ks9IhK0epEiTw8aIErbvH9PI+6XbqhyIQy3462nEsn7UVzjQ==}
+    dev: true
+
+  /@types/ws@8.5.10:
+    resolution: {integrity: sha512-vmQSUcfalpIq0R9q7uTo2lXs6eGIpt9wtnLdMv9LVpIjCA/+ufZRozlVoVelIYixx1ugCBKDhn89vnsEGOCx9A==}
+    dependencies:
+      '@types/node': 18.19.15
     dev: true
 
   /@types/yargs-parser@21.0.3:
@@ -7852,6 +7876,19 @@ packages:
 
   /wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+  /ws@8.16.0:
+    resolution: {integrity: sha512-HS0c//TP7Ina87TfiPUz1rQzMhHrl/SG2guqRcTOIUYD2q8uhUdNHZYJUaQ8aTGPzCh+c6oawMKW35nFl1dxyQ==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+    dev: false
 
   /xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}

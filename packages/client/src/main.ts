@@ -51,8 +51,8 @@ export class NrpClient {
 
   start() {
     this.handleStream.register(this.handleSettings);
-    this.handleStream.register(this.vhostClient.handleReqHeaders);
-    this.handleStream.register(this.vhostClient.handleReqData);
+    this.handleStream.register(this.vhostClient.handleNrpsReqHeaders);
+    this.handleStream.register(this.vhostClient.handleNrpsReqData);
     this.vhostClient.initSettings();
     this.connect();
     this.ping();
@@ -84,25 +84,26 @@ export class NrpClient {
     });
     // 当从服务器接收到数据时触发
     nrpc.on('data', (data) => {
-      log.info(`receive server chunk`);
+      log.info(`nrpc:data receive server chunk`);
       this.handleStream.parse(data, nrpc);
     });
 
     // 当连接关闭时触发
     nrpc.on('close', (hadError) => {
-      log.info(`Connection closed hadError: ${hadError}`);
+      log.info(`nrpc:close Connection closed hadError: ${hadError}`);
       this.nrpc = null;
+      this.tryReconnect();
     });
 
     nrpc.on('end', () => {
-      log.info('Disconnected from server');
+      log.info('nrpc:end Disconnected from server');
       // 服务器正常关闭连接，可能不需要重连
       // 如果需要在正常断开后也尝试重连，请在此处调用tryReconnect()
-      this.tryReconnect();
     });
 
     // 当发生错误时触发
     nrpc.on('error', (err) => {
+      log.info('nrpc:error');
       log.error(err);
       nrpc.destroy();
     });

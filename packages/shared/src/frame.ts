@@ -12,6 +12,7 @@ export enum FrameType {
   WINDOW_UPDATE,
   CONTINUATION,
   WS_DATA,
+  WS_HEADERS,
   // 其他帧类型可以按需添加
 }
 
@@ -78,7 +79,15 @@ export class Frame {
   }
 
   get isHeaders() {
+    return this.isHTTPHeaders || this.isWSHeaders;
+  }
+
+  get isHTTPHeaders() {
     return this.type === FrameType.HEADERS;
+  }
+
+  get isWSHeaders() {
+    return this.type === FrameType.WS_HEADERS;
   }
 
   get isSettings() {

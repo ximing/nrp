@@ -38,8 +38,7 @@ export class VhostClient {
         delete headers.headers.hostname;
         const conf = this.hostConfMap.get(headers.host);
         if (conf) {
-          const type = headers.type;
-          if (type === 'http') {
+          if (frame.isHTTPHeaders) {
             const requestOpt = {
               ...headers,
               host: '127.0.0.1',
@@ -138,8 +137,7 @@ export class VhostClient {
           );
         }
       } else {
-        // TODO ws 和 http 的需要通过 类型区分
-        log.warn(`nrpc need host`);
+        log.warn(`nrpc ${frame.isHTTPHeaders ? 'http' : 'ws'} need host`);
         nrpc.write(
           new Frame(
             FrameType.DATA,

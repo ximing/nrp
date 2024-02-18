@@ -96,7 +96,6 @@ export class VhostManager {
         log.info(`handleHttpRequest vhost streamId: ${streamId}`);
         this.responseMap.set(streamId, res);
         const headersStr = JSON.stringify({
-          type: 'http',
           method: req.method,
           path: req.url,
           host,
@@ -142,14 +141,13 @@ export class VhostManager {
       if (nfrClient) {
         const streamId = this.getStreamId();
         const headersStr = JSON.stringify({
-          type: 'ws',
           path: request.url,
           host,
           headers: request.headers,
         });
         const payload = Buffer.from(headersStr, 'utf8');
         nfrClient.write(
-          new Frame(FrameType.HEADERS, FrameFlag.END_HEADERS, streamId, payload).encode(),
+          new Frame(FrameType.WS_HEADERS, FrameFlag.END_HEADERS, streamId, payload).encode(),
         );
         this.wsServer.handleUpgrade(request, socket, head, (ws) => {
           // @ts-ignore
@@ -200,7 +198,7 @@ export class VhostManager {
 
   // 处理服务端
   handleNrpcResHeaders = (frame: Frame, nrpClient: net.Socket) => {
-    if (frame.isHeaders) {
+    if (frame.isHTTPHeaders) {
       const res = this.getResponse(frame.streamId);
       if (res) {
         const headersStr = frame.payload.toString('utf-8');

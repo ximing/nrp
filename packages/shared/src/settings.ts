@@ -3,6 +3,8 @@ import { ClientHttpSetting } from './types';
 export const DEFAULT_CLIENT_TIMEOUT = 10000;
 export const DEFAULT_CLIENT_RETRY = 3;
 export const DEFAULT_BACKOFF = { min: 100, max: 1000, factor: 2 };
+export const DEFAULT_IDLE_TIMEOUT = 60000;
+export const DEFAULT_PING_INTERVAL = 10000;
 
 export interface NormalizedClientSettings {
   bind_port: number;
@@ -137,4 +139,20 @@ export function authorizeClientSettings(
     return { ok: false, reason: 'wrong secret' };
   }
   return normalizeClientSettings(input);
+}
+
+export function resolveIdleTimeout(config: { idle_timeout?: number } | undefined): number {
+  const value = config?.idle_timeout;
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  return DEFAULT_IDLE_TIMEOUT;
+}
+
+export function reconnectDelay(
+  attempt: number,
+  backoff: { min: number; max: number; factor: number },
+): number {
+  const growth = backoff.min * Math.pow(backoff.factor, attempt - 1);
+  return Math.min(backoff.max, growth);
 }

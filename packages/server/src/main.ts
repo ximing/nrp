@@ -1,5 +1,12 @@
 import * as net from 'net';
-import { Frame, FrameFlag, FrameType, HandleStream, NrpServerConfig } from '@nrpjs/shared';
+import {
+  Frame,
+  FrameFlag,
+  FrameType,
+  HandleStream,
+  NrpServerConfig,
+  resolveIdleTimeout,
+} from '@nrpjs/shared';
 import { ClientManager } from './manager/client';
 import { VhostManager } from './manager/vhost';
 import { Buffer } from 'buffer';
@@ -62,7 +69,7 @@ export class NrpServer {
       log.info(`new client connected,${nrpClient.remoteAddress}:${nrpClient.remotePort}`);
       this.controlSockets.add(nrpClient);
 
-      const idle = this.config.idle_timeout ?? 60000;
+      const idle = resolveIdleTimeout(this.config);
       nrpClient.setTimeout(idle);
       nrpClient.on('timeout', () => {
         log.info('control socket idle timeout');

@@ -3,7 +3,7 @@ import * as http from 'http';
 import { Buffer } from 'buffer';
 import express, { Express, Request, Response } from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
-import { ClientHttpSetting, Frame, FrameFlag, FrameType } from '@nrpjs/shared';
+import { allocateStreamId, ClientHttpSetting, Frame, FrameFlag, FrameType } from '@nrpjs/shared';
 import { NrpServer } from '../main';
 import { logGen } from '../logger';
 import stream from 'node:stream';
@@ -17,7 +17,9 @@ export class VhostManager {
   wsServer!: WebSocketServer;
 
   private hostMap = new Map<string, net.Socket>();
-  private streamId = 2;
+  private streamCursor = { next: 2 };
+  private inFlightIds = new Set<number>();
+  private streamOwners = new Map<number, net.Socket>();
   private responseMap = new Map<number, Response>();
   private wsStreamMap = new Map<WebSocket, number>();
   private streamWsMap = new Map<number, WebSocket>();
@@ -96,6 +98,8 @@ export class VhostManager {
 
   closeStream(id: number) {
     log.info(`close stream ${id}`);
+    this.inFlightIds.delete(id);
+    this.streamOwners.delete(id);
     this.responseMap.delete(id);
     const ws = this.streamWsMap.get(id);
     if (ws) {
@@ -104,11 +108,47 @@ export class VhostManager {
     }
   }
 
+  inFlightCount() {
+    return this.responseMap.size;
+  }
+
+  releaseSocket(socket: net.Socket) {
+    this.rmVhost(socket);
+    const owned = [...this.streamOwners.entries()].filter(([, owner]) => owner === socket);
+    for (const [id] of owned) {
+      const response = this.responseMap.get(id);
+      const ws = this.streamWsMap.get(id);
+      this.closeStream(id);
+      if (response) {
+        this.failClosed(response, 502);
+      }
+      if (ws) {
+        try {
+          ws.close();
+        } catch (err) {
+          log.error(err as Error);
+        }
+      }
+    }
+  }
+
   getStreamId() {
-    // TODO 取余，防止溢出
-    const streamId = this.streamId;
-    this.streamId = streamId + 2;
+    const streamId = allocateStreamId(this.streamCursor, 2, 2, this.inFlightIds);
+    this.inFlightIds.add(streamId);
     return streamId;
+  }
+
+  private writeFrame(socket: net.Socket, frame: Frame) {
+    if (socket.destroyed || !socket.writable) {
+      return false;
+    }
+    try {
+      socket.write(frame.encode());
+      return true;
+    } catch (err) {
+      log.error(err as Error);
+      return false;
+    }
   }
 
   /*
@@ -146,6 +186,7 @@ export class VhostManager {
         const streamId = this.getStreamId();
         log.info(`handleHttpRequest vhost streamId: ${streamId}`);
         this.responseMap.set(streamId, res);
+        this.streamOwners.set(streamId, nfrClient);
         const headersStr = JSON.stringify({
           method: req.method,
           path: req.url,
@@ -153,19 +194,27 @@ export class VhostManager {
           headers: req.headers,
         });
         const payload = Buffer.from(headersStr, 'utf8');
-        nfrClient.write(
-          new Frame(FrameType.HEADERS, FrameFlag.END_HEADERS, streamId, payload).encode(),
-          () => {
-            log.info(`handleHttpRequest sent headers, ${headersStr}`);
-          },
+        const sent = this.writeFrame(
+          nfrClient,
+          new Frame(FrameType.HEADERS, FrameFlag.END_HEADERS, streamId, payload),
         );
+        if (!sent) {
+          this.closeStream(streamId);
+          this.failClosed(res, 502);
+          return;
+        }
+        log.info(`handleHttpRequest sent headers, ${headersStr}`);
         req.on('data', (chunk) => {
-          nfrClient.write(new Frame(FrameType.DATA, FrameFlag.PADDED, streamId, chunk).encode());
+          this.writeFrame(nfrClient, new Frame(FrameType.DATA, FrameFlag.PADDED, streamId, chunk));
         });
         req.on('end', () => {
-          nfrClient.write(
-            new Frame(FrameType.DATA, FrameFlag.END_DATA, streamId, Buffer.alloc(0)).encode(),
+          this.writeFrame(
+            nfrClient,
+            new Frame(FrameType.DATA, FrameFlag.END_DATA, streamId, Buffer.alloc(0)),
           );
+        });
+        req.on('error', (err) => {
+          log.error(err);
         });
         req.on('close', () => {
           // this.closeStream(streamId);
@@ -191,14 +240,16 @@ export class VhostManager {
       const nfrClient = this.getNFRClient(host);
       if (nfrClient) {
         const streamId = this.getStreamId();
+        this.streamOwners.set(streamId, nfrClient);
         const headersStr = JSON.stringify({
           path: request.url,
           host,
           headers: request.headers,
         });
         const payload = Buffer.from(headersStr, 'utf8');
-        nfrClient.write(
-          new Frame(FrameType.WS_HEADERS, FrameFlag.END_HEADERS, streamId, payload).encode(),
+        this.writeFrame(
+          nfrClient,
+          new Frame(FrameType.WS_HEADERS, FrameFlag.END_HEADERS, streamId, payload),
         );
         this.wsServer.handleUpgrade(request, socket, head, (ws) => {
           // @ts-ignore

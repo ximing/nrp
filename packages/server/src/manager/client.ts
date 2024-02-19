@@ -37,9 +37,9 @@ export class ClientManager {
   }
 
   rmClient(id: number) {
-    let socket = this.clientMap.get(id);
+    const socket = this.clientMap.get(id);
     if (socket) {
-      this.vHostManager.rmVhost(socket);
+      this.vHostManager.releaseSocket(socket);
       this.clientMap.delete(id);
     }
   }

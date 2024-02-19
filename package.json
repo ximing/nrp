@@ -13,6 +13,7 @@
     "rm:dist": "find packages/* -type d -name dist -prune -exec rm -rf '{}' +",
     "lint:es": "eslint --ext \"src/**/*.ts\" src mock tests",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "test": "pnpm --filter @nrpjs/shared run build && pnpm --filter @nrpjs/server --filter @nrpjs/client run build && PINO_LOG_LEVEL=silent node --test tests/*.test.js",
     "prepare": "husky install",
     "commit": "git add . && cz",
     "preinstall-old": "npx only-allow pnpm",
@@ -41,6 +42,9 @@
   },
   "homepage": "https://github.com/ximing/nrp#readme",
   "devDependencies": {
+    "@nrpjs/client": "workspace:*",
+    "@nrpjs/server": "workspace:*",
+    "@nrpjs/shared": "workspace:*",
     "@changesets/cli": "^2.26.0",
     "@commitlint/cli": "^17.4.4",
     "@commitlint/config-conventional": "^17.4.4",

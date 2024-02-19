@@ -24,6 +24,7 @@ export interface NrpServerConfig {
   vhost_http_port: number;
   vhost_https_port?: number;
   log_file?: string;
+  idle_timeout?: number;
 }
 
 export interface NrpDashboardConfig {

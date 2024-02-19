@@ -22,7 +22,7 @@ export class VhostManager {
   private wsStreamMap = new Map<WebSocket, number>();
   private streamWsMap = new Map<number, WebSocket>();
 
-  start() {
+  start(): Promise<number> {
     const app = express();
     const server = http.createServer(app);
     const wsServer = new WebSocketServer({ clientTracking: false, noServer: true });
@@ -30,11 +30,37 @@ export class VhostManager {
     this.vhostApp = app;
     this.wsServer = wsServer;
     server.on('upgrade', this.handleWsRequest);
+    server.on('clientError', (_err, socket) => {
+      socket.destroy();
+    });
     wsServer.on('connection', this.handleWsConnection);
     app.all('*', this.handleHttpRequest);
     // 使用创建的HTTP服务器监听端口，而不是直接使用Express的监听方法
-    server.listen(this.nrpServer.getConfig().vhost_http_port, () => {
-      log.info(`VHost listening on port ${this.nrpServer.getConfig().vhost_http_port}`);
+    return new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(this.nrpServer.getConfig().vhost_http_port, () => {
+        const listening = server.address();
+        const port =
+          listening && typeof listening === 'object'
+            ? listening.port
+            : this.nrpServer.getConfig().vhost_http_port;
+        log.info(`VHost listening on port ${port}`);
+        resolve(port);
+      });
+    });
+  }
+
+  close(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.wsServer) {
+        this.wsServer.close();
+      }
+      if (!this.vhostServer) {
+        resolve();
+        return;
+      }
+      this.vhostServer.closeAllConnections();
+      this.vhostServer.close(() => resolve());
     });
   }
 

@@ -12,6 +12,8 @@ export class NrpServer {
 
   private handleStream = new HandleStream();
 
+  private controlSockets = new Set<net.Socket>();
+
   constructor(private config: NrpServerConfig) {
     this.clientManager = new ClientManager(this);
     this.vhostManager = new VhostManager(this);
@@ -46,15 +48,30 @@ export class NrpServer {
 
     this.nrps = net.createServer((nrpClient) => {
       log.info(`new client connected,${nrpClient.remoteAddress}:${nrpClient.remotePort}`);
+      this.controlSockets.add(nrpClient);
+
+      const idle = this.config.idle_timeout ?? 60000;
+      nrpClient.setTimeout(idle);
+      nrpClient.on('timeout', () => {
+        log.info('control socket idle timeout');
+        nrpClient.end();
+      });
 
       nrpClient.on('data', (chunk) => {
         log.info(`receive nrpClient chunk`);
-        this.handleStream.parse(chunk, nrpClient);
+        try {
+          this.handleStream.parse(chunk, nrpClient);
+        } catch (err) {
+          log.error(err as Error);
+          nrpClient.destroy();
+        }
       });
 
       // 监听关闭事件
       nrpClient.on('close', () => {
         log.info('Connection closed');
+        this.controlSockets.delete(nrpClient);
+        this.handleStream.drop(nrpClient);
         const meta = this.clientManager.getMeta(nrpClient);
         if (meta) {
           log.info(`closed client id,${meta.id}`);
@@ -77,18 +94,51 @@ export class NrpServer {
         const meta = this.clientManager.getMeta(nrpClient);
         log.info(`nrpClient disconnected ${meta?.id}`);
       });
+    });
 
-      // 可以选择设置超时监听器
-      nrpClient.setTimeout(60000); // 设置超时时间，例如 60 秒
-      nrpClient.on('timeout', () => {
-        console.log('Socket timeout');
-        nrpClient.end(); // 结束连接
+    return new Promise((resolve, reject) => {
+      this.nrps.once('error', reject);
+      this.nrps.listen(this.config.port, () => {
+        this.nrps.removeListener('error', reject);
+        this.nrps.on('error', (err) => {
+          log.error(err);
+        });
+        const listening = this.nrps.address();
+        const port = listening && typeof listening === 'object' ? listening.port : this.config.port;
+        log.info(`Server listening on port ${port}`);
+        this.vhostManager.start().then(
+          (vhostHttpPort) => {
+            resolve({ port, vhostHttpPort });
+          },
+          reject,
+        );
       });
     });
+  }
 
-    this.nrps.listen(this.config.port, () => {
-      log.info(`Server listening on port ${this.config.port}`);
-    });
-    this.vhostManager.start();
+  close(): Promise<void> {
+    for (const socket of this.controlSockets) {
+      socket.destroy();
+    }
+    return this.vhostManager.close().then(
+      () =>
+        new Promise((resolve, reject) => {
+          if (!this.nrps) {
+            resolve();
+            return;
+          }
+          const listening = this.nrps as net.Server & { closeAllConnections?: () => void };
+          if (typeof listening.closeAllConnections === 'function') {
+            listening.closeAllConnections();
+          }
+          this.nrps.close((err) => {
+            if (err) {
+              reject(err);
+              return;
+            }
+            resolve();
+          });
+        }),
+    );
   }
 }

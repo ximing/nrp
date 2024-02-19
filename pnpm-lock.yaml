@@ -17,6 +17,15 @@ importers:
       '@commitlint/config-conventional':
         specifier: ^17.4.4
         version: 17.8.1
+      '@nrpjs/client':
+        specifier: workspace:*
+        version: link:packages/client
+      '@nrpjs/server':
+        specifier: workspace:*
+        version: link:packages/server
+      '@nrpjs/shared':
+        specifier: workspace:*
+        version: link:packages/shared
       '@types/node':
         specifier: ^18.19.15
         version: 18.19.15

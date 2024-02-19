@@ -85,7 +85,12 @@ export class NrpClient {
     // 当从服务器接收到数据时触发
     nrpc.on('data', (data) => {
       log.info(`nrpc:data receive server chunk`);
-      this.handleStream.parse(data, nrpc);
+      try {
+        this.handleStream.parse(data, nrpc);
+      } catch (err) {
+        log.error(err as Error);
+        nrpc.destroy();
+      }
     });
 
     // 当连接关闭时触发

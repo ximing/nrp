@@ -66,9 +66,12 @@ export class VhostManager {
 
   setVhost(subdomain_host: string, httpSettings: ClientHttpSetting, nfrClient: net.Socket) {
     Object.values(httpSettings).forEach((setting) => {
-      // @ts-ignore
-      const { subdomain } = setting;
-      const domain = `${subdomain}.${subdomain_host}`;
+      const domain = subdomain_host ? `${setting.subdomain}.${subdomain_host}` : setting.subdomain;
+      const existing = this.hostMap.get(domain);
+      if (existing && existing !== nfrClient && !existing.destroyed && existing.writable) {
+        log.warn(`refuse to replace live vhost ${domain}`);
+        return;
+      }
       this.hostMap.set(domain, nfrClient);
     });
   }
@@ -111,12 +114,34 @@ export class VhostManager {
   /*
    * 处理HTTP请求，将请求转发给nfr client
    * */
+  private failClosed(res: Response, status = 404) {
+    try {
+      if (res.headersSent || res.writableEnded) {
+        res.end();
+        return;
+      }
+      res.status(status);
+      res.end();
+    } catch (err) {
+      log.error(err as Error);
+    }
+  }
+
   handleHttpRequest = (req: Request, res: Response) => {
+    try {
+      this.proxyHttp(req, res);
+    } catch (err) {
+      log.error(err as Error);
+      this.failClosed(res, 502);
+    }
+  };
+
+  private proxyHttp(req: Request, res: Response) {
     const host = req.headers.host;
     if (host) {
       log.info(`handleHttpRequest request host: ${host}`);
       const nfrClient = this.getNFRClient(host);
-      if (nfrClient) {
+      if (nfrClient && !nfrClient.destroyed && nfrClient.writable) {
         // 将HTTP请求封装成帧，传递给nrp client
         const streamId = this.getStreamId();
         log.info(`handleHttpRequest vhost streamId: ${streamId}`);
@@ -149,10 +174,10 @@ export class VhostManager {
         //   this.closeStream(streamId);
         // });
       } else {
-        res.status(500).send('handleHttpRequest nfrClient not found');
+        this.failClosed(res, 502);
       }
     } else {
-      res.status(500).send('handleHttpRequest host not found');
+      this.failClosed(res, 404);
     }
   };
 

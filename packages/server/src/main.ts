@@ -24,12 +24,22 @@ export class NrpServer {
   }
 
   handleSettings = (frame: Frame, nrpClient: net.Socket) => {
-    if (frame.isSettings) {
-      const settingsStr = frame.payload.toString('utf8');
-      log.info(`settings, ${settingsStr}`);
-      const settings = JSON.parse(settingsStr);
-      const id = this.clientManager.setClient(nrpClient, settings);
-      log.info(`nrpClient Id, ${id}`);
+    if (!frame.isSettings) {
+      return;
+    }
+    let settings: unknown;
+    try {
+      settings = JSON.parse(frame.payload.toString('utf8'));
+    } catch (err) {
+      log.error(err as Error);
+      return;
+    }
+    const id = this.clientManager.setClient(nrpClient, settings);
+    if (id == null) {
+      return;
+    }
+    log.info(`nrpClient Id, ${id}`);
+    try {
       nrpClient.write(
         new Frame(
           FrameType.SETTINGS,
@@ -38,6 +48,8 @@ export class NrpServer {
           Buffer.from(JSON.stringify({ id }), 'utf-8'),
         ).encode(),
       );
+    } catch (err) {
+      log.error(err as Error);
     }
   };
 

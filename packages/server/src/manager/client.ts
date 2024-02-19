@@ -1,6 +1,7 @@
 import { NrpServer } from '../main';
 import * as net from 'net';
-import { ClientSettings } from '@nrpjs/shared';
+import { authorizeClientSettings, ClientSettings } from '@nrpjs/shared';
+import { log } from '../logger';
 
 export class ClientManager {
   private id = 0;
@@ -15,17 +16,20 @@ export class ClientManager {
 
   private clientMetaMap = new WeakMap<net.Socket, { id: number; settings: ClientSettings }>();
 
-  setClient(nrpClient: net.Socket, settings: ClientSettings) {
-    // TODO 校验 setting必填，非必填给默认值
+  setClient(nrpClient: net.Socket, settings: unknown): number | null {
+    const auth = authorizeClientSettings(settings, this.nrpServer.getConfig().secret);
+    if (!auth.ok) {
+      log.warn(`reject settings: ${auth.reason}`);
+      return null;
+    }
+    const normalized: ClientSettings = auth.settings;
     const id = ++this.id;
     this.clientMap.set(id, nrpClient);
     this.setMeta(nrpClient, {
       id,
-      settings,
+      settings: normalized,
     });
-    if (settings.http) {
-      this.vHostManager.setVhost(settings.subdomain_host!, settings.http, nrpClient);
-    }
+    this.vHostManager.setVhost(normalized.subdomain_host ?? '', normalized.http, nrpClient);
     return id;
     // socket.write(configMessage, 'utf8', () => {
     //   console.log('配置信息已发送');

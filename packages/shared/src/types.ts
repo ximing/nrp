@@ -17,6 +17,8 @@ export interface ClientSettings {
     factor: number;
   };
   http: ClientHttpSetting;
+  secret?: string;
+  ping_interval?: number;
 }
 
 export interface NrpServerConfig {
@@ -25,6 +27,7 @@ export interface NrpServerConfig {
   vhost_https_port?: number;
   log_file?: string;
   idle_timeout?: number;
+  secret?: string;
 }
 
 export interface NrpDashboardConfig {

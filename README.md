@@ -11,6 +11,7 @@ Provide the following `nrps.yaml` configuration on a server capable of providing
 ```yaml
 port: 9000
 vhost_http_port: 9001
+secret: your-shared-secret
 ```
 
 ```bash
@@ -26,6 +27,7 @@ Provide the following `nrpc.yaml` configuration on the client machine that needs
 bind_port: 9000 # NRP 服务监听的端口
 bind_host: 127.0.0.1 # NRP 服务监听的端口
 subdomain_host: subdomain.com # 你拥有的域名，用于子域名访问
+secret: your-shared-secret
 http:
   test:
     subdomain: demo

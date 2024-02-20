@@ -1,1 +1,1 @@
-export { NrpClient } from './main';
+export { NrpClient, startClientFromConfigFile } from './main';

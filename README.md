@@ -66,6 +66,25 @@ curl -H 'Host: app.example.com:9001' http://127.0.0.1:9001/
 
 `http` 下面可以写多项，每一项有自己的 `subdomain` 和 `local_port`。键名（上面的 `web`）只在配置里区分条目。
 
+## 控制面板
+
+服务端和客户端各自有一份网页控制面板，跟命令打在一起，不需要另起前端开发服务。在对应的 YAML 里写上监听地址和 Basic 认证账号后，用浏览器打开该地址，按提示输入用户名和密码。
+
+服务端示例：
+
+```yaml
+dashboard_addr: 127.0.0.1
+dashboard_port: 7500
+dashboard_user: admin
+dashboard_pwd: change-me
+```
+
+打开 `http://127.0.0.1:7500/`。客户端用同一组字段，端口不要和服务端、控制端口、对外 HTTP 端口撞车，例如 `dashboard_port: 7501`。
+
+`dashboard_user` 和 `dashboard_pwd` 是这一侧面板的唯一账号。没带认证、或账号密码不对时，页面和配置接口都返回 401，配置文件保持原样。通过认证后，服务端面板可以改服务端配置；客户端面板可以改客户端配置，并添加 HTTP 代理（子域名和本机端口）。保存会写回启动命令时的那份 YAML。重新启动对应命令后，新进程读到这些值。
+
+省略 `dashboard_port` 时不启动面板。
+
 ## 配置
 
 字段的简表也写在 [docs/config.md](docs/config.md)。
@@ -78,6 +97,10 @@ curl -H 'Host: app.example.com:9001' http://127.0.0.1:9001/
 | `vhost_http_port` | 对外的 HTTP 端口 |
 | `secret` | 共享密钥。服务端未配置、客户端缺失，或两边不一致时，不登记虚拟主机 |
 | `idle_timeout` | 可选，单位毫秒。控制连接在这段时间里没有任何数据就关闭。默认 `60000`。心跳也算数据 |
+| `dashboard_addr` | 可选。控制面板监听地址，默认 `127.0.0.1` |
+| `dashboard_port` | 可选。控制面板端口。设置后 `nrps` 才提供面板 |
+| `dashboard_user` | 面板 Basic 认证用户名 |
+| `dashboard_pwd` | 面板 Basic 认证密码 |
 
 ### 客户端
 
@@ -96,6 +119,10 @@ curl -H 'Host: app.example.com:9001' http://127.0.0.1:9001/
 | `backoff.max` | 可选。等待时间的上限。默认 `1000` |
 | `backoff.factor` | 可选。第 n 次重连前等待 `min(max, min × factorⁿ⁻¹)` 毫秒。默认 `2` |
 | `ping_interval` | 可选，单位毫秒。向服务端发送心跳的间隔。默认 `10000` |
+| `dashboard_addr` | 可选。控制面板监听地址，默认 `127.0.0.1` |
+| `dashboard_port` | 可选。控制面板端口。设置后 `nrpc` 才提供面板 |
+| `dashboard_user` | 面板 Basic 认证用户名 |
+| `dashboard_pwd` | 面板 Basic 认证密码 |
 
 连上服务端之后，重连计数清零。`ping_interval` 要小于服务端的 `idle_timeout`，这样心跳会落在空闲时限之内，连接可以保持。
 
@@ -111,6 +138,6 @@ curl -H 'Host: app.example.com:9001' http://127.0.0.1:9001/
 
 ## 仓库里的示例
 
-`app/demo/nrps.yaml` 与 `app/demo/nrpc.yaml` 是一套对应配置：共享密钥为 `nrp-demo`，本机示例服务端口为 `5173`，对外主机名为 `nrpc.delu.life:9001`。
+`app/demo/nrps.yaml` 与 `app/demo/nrpc.yaml` 是一套对应配置：共享密钥为 `nrp-demo`，本机示例服务端口为 `5173`，对外主机名为 `nrpc.delu.life:9001`。服务端面板是 `http://127.0.0.1:7500/`，客户端面板是 `http://127.0.0.1:7501/`，用户名都是 `admin`，密码都是 `nrp-demo`。
 
 修改和构建这个仓库见 [docs/development.md](docs/development.md)。许可证是 MIT，见 [LICENSE](LICENSE)。

@@ -2,5 +2,8 @@ export * from './frame';
 export * from './stream';
 export * from './settings';
 export * from './stream-id';
+export * from './basic-auth';
+export * from './config-edit';
+export * from './panel-server';
 export * from './types';
 export * from './logger';

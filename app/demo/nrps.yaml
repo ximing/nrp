@@ -1,3 +1,7 @@
 port: 9000
 vhost_http_port: 9001
 secret: nrp-demo
+dashboard_addr: 127.0.0.1
+dashboard_port: 7500
+dashboard_user: admin
+dashboard_pwd: nrp-demo

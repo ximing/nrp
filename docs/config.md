@@ -9,6 +9,10 @@ port: 9000
 vhost_http_port: 9001
 secret: your-shared-secret
 idle_timeout: 60000
+dashboard_addr: 127.0.0.1
+dashboard_port: 7500
+dashboard_user: admin
+dashboard_pwd: change-me
 ```
 
 | 字段 | 是否必填 | 默认 | 说明 |
@@ -17,6 +21,10 @@ idle_timeout: 60000
 | `vhost_http_port` | 是 |  | 访问者请求的 HTTP 端口 |
 | `secret` | 是 |  | 非空共享密钥。缺失或与客户端不一致时不登记虚拟主机 |
 | `idle_timeout` | 否 | `60000` | 控制连接静默这么多毫秒后关闭。心跳会重新计算这段时间 |
+| `dashboard_addr` | 否 | `127.0.0.1` | 控制面板监听地址。设置了 `dashboard_port` 才启动 |
+| `dashboard_port` | 否 |  | 控制面板自己的端口，与 `port`、`vhost_http_port` 分开 |
+| `dashboard_user` | 启用面板时必填 |  | 面板 HTTP Basic 认证用户名 |
+| `dashboard_pwd` | 启用面板时必填 |  | 面板 HTTP Basic 认证密码 |
 
 ## 客户端 `nrpc.yaml`
 
@@ -32,6 +40,10 @@ backoff:
   max: 1000
   factor: 2
 ping_interval: 10000
+dashboard_addr: 127.0.0.1
+dashboard_port: 7501
+dashboard_user: admin
+dashboard_pwd: change-me
 http:
   web:
     subdomain: app
@@ -53,7 +65,13 @@ http:
 | `backoff.max` | 否 | `1000` | 等待上限，毫秒 |
 | `backoff.factor` | 否 | `2` | 第 n 次重连前等待 `min(max, min × factorⁿ⁻¹)` 毫秒 |
 | `ping_interval` | 否 | `10000` | 心跳间隔，毫秒。应小于服务端 `idle_timeout` |
+| `dashboard_addr` | 否 | `127.0.0.1` | 客户端控制面板监听地址 |
+| `dashboard_port` | 否 |  | 客户端控制面板端口，与服务端面板、`bind_port` 分开 |
+| `dashboard_user` | 启用面板时必填 |  | 面板 HTTP Basic 认证用户名 |
+| `dashboard_pwd` | 启用面板时必填 |  | 面板 HTTP Basic 认证密码 |
 
 连接成功后重连计数清零。省略 `timeout`、`retry`、`backoff` 或 `ping_interval` 时使用上表的默认值。
 
 缺少 `bind_host`、`bind_port` 或合法的 `http` 条目，或端口不是整数时，客户端退出，服务端不创建路由。一条仍可写的连接已经登记某个子域名时，后到的连接不会替换它。
+
+控制面板的四个 `dashboard_*` 字段两边相同。浏览器打开 `http://dashboard_addr:dashboard_port/`，用该侧的 `dashboard_user` 和 `dashboard_pwd` 做 Basic 认证。未认证或密码错误得到 401，配置文件不变。认证通过后，服务端面板改服务端字段；客户端面板改客户端字段，并用子域名加本机端口新增 `http` 代理。写入的是命令启动时的 YAML，下次启动时加载。

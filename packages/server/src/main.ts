@@ -1,16 +1,20 @@
 import * as net from 'net';
+import * as path from 'path';
 import {
+  checkBasicAuth,
   Frame,
   FrameFlag,
   FrameType,
   HandleStream,
   NrpServerConfig,
   resolveIdleTimeout,
+  startPanel,
 } from '@nrpjs/shared';
 import { ClientManager } from './manager/client';
 import { VhostManager } from './manager/vhost';
 import { Buffer } from 'buffer';
 import { log } from './logger';
+import { readConfigFile, updateServerFile } from './config-file';
 
 export class NrpServer {
   nrps!: net.Server;
@@ -21,7 +25,9 @@ export class NrpServer {
 
   private controlSockets = new Set<net.Socket>();
 
-  constructor(private config: NrpServerConfig) {
+  private panelClose: (() => Promise<void>) | null = null;
+
+  constructor(private config: NrpServerConfig, private configPath?: string) {
     this.clientManager = new ClientManager(this);
     this.vhostManager = new VhostManager(this);
   }
@@ -127,7 +133,12 @@ export class NrpServer {
         log.info(`Server listening on port ${port}`);
         this.vhostManager.start().then(
           (vhostHttpPort) => {
-            resolve({ port, vhostHttpPort });
+            this.listenDashboard().then(
+              (dashboardPort) => {
+                resolve({ port, vhostHttpPort, dashboardPort });
+              },
+              reject,
+            );
           },
           reject,
         );
@@ -135,11 +146,48 @@ export class NrpServer {
     });
   }
 
+  private listenDashboard(): Promise<number | null> {
+    if (!this.configPath) {
+      return Promise.resolve(null);
+    }
+    const raw = readConfigFile(this.configPath);
+    const record = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    if (typeof record.dashboard_port !== 'number') {
+      return Promise.resolve(null);
+    }
+    const addr =
+      typeof record.dashboard_addr === 'string' && record.dashboard_addr.length > 0
+        ? record.dashboard_addr
+        : '127.0.0.1';
+    const configPath = this.configPath;
+    return startPanel({
+      addr,
+      port: record.dashboard_port,
+      staticDir: path.join(__dirname, 'panel'),
+      authorize: (header) => {
+        const current = readConfigFile(configPath);
+        const cfg = current && typeof current === 'object' ? (current as Record<string, unknown>) : {};
+        return checkBasicAuth(header, cfg.dashboard_user, cfg.dashboard_pwd);
+      },
+      handlers: {
+        role: 'server',
+        getConfig: () => readConfigFile(configPath),
+        putConfig: (patch) => updateServerFile(configPath, patch),
+      },
+    }).then((started) => {
+      this.panelClose = started.close;
+      log.info(`panel listening on http://${addr}:${started.port}/`);
+      return started.port;
+    });
+  }
+
   close(): Promise<void> {
     for (const socket of this.controlSockets) {
       socket.destroy();
     }
-    return this.vhostManager.close().then(
+    const panel = this.panelClose ? this.panelClose() : Promise.resolve();
+    this.panelClose = null;
+    return panel.then(() => this.vhostManager.close()).then(
       () =>
         new Promise((resolve, reject) => {
           if (!this.nrps) {
@@ -160,4 +208,12 @@ export class NrpServer {
         }),
     );
   }
+}
+
+export async function startServerFromConfigFile(configPath: string) {
+  const absolute = path.resolve(configPath);
+  const config = readConfigFile(absolute) as NrpServerConfig;
+  const server = new NrpServer(config, absolute);
+  const address = await server.start();
+  return { server, address };
 }

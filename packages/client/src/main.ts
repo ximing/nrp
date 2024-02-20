@@ -1,8 +1,10 @@
 import * as net from 'net';
 import { Buffer } from 'buffer';
 
+import * as path from 'path';
 import {
   allocateStreamId,
+  checkBasicAuth,
   ClientSettings,
   DEFAULT_PING_INTERVAL,
   Frame,
@@ -12,12 +14,16 @@ import {
   NormalizedClientSettings,
   normalizeClientSettings,
   reconnectDelay,
+  startPanel,
 } from '@nrpjs/shared';
 import { VhostClient } from './manager/vhost';
 import { log } from './logger';
+import { addClientProxyFile, readConfigFile, updateClientFile } from './config-file';
 
 export class NrpClient {
   private settings: NormalizedClientSettings;
+
+  private panelClose: (() => Promise<void>) | null = null;
 
   private nrpc: net.Socket | null = null;
 
@@ -45,7 +51,7 @@ export class NrpClient {
 
   heartbeatWrites = 0;
 
-  constructor(settings: ClientSettings) {
+  constructor(settings: ClientSettings, private configPath?: string) {
     const normalized = normalizeClientSettings(settings);
     if (!normalized.ok) {
       throw new Error(normalized.reason);
@@ -72,7 +78,7 @@ export class NrpClient {
     return this.heartbeatTimer != null;
   }
 
-  stop() {
+  stop(): Promise<void> {
     this.stopped = true;
     this.clearReconnectTimer();
     this.clearConnectTimer();
@@ -83,6 +89,9 @@ export class NrpClient {
     if (socket && !socket.destroyed) {
       socket.destroy();
     }
+    const panel = this.panelClose ? this.panelClose() : Promise.resolve();
+    this.panelClose = null;
+    return panel;
   }
 
   handleSettings = (frame: Frame) => {
@@ -92,12 +101,49 @@ export class NrpClient {
     }
   };
 
-  start() {
+  start(): Promise<number | null> {
     this.handleStream.register(this.handleSettings);
     this.handleStream.register(this.vhostClient.handleNrpsReqHeaders);
     this.handleStream.register(this.vhostClient.handleNrpsReqData);
     this.vhostClient.initSettings();
     this.connect();
+    return this.listenDashboard();
+  }
+
+  private listenDashboard(): Promise<number | null> {
+    if (!this.configPath) {
+      return Promise.resolve(null);
+    }
+    const raw = readConfigFile(this.configPath);
+    const record = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+    if (typeof record.dashboard_port !== 'number') {
+      return Promise.resolve(null);
+    }
+    const addr =
+      typeof record.dashboard_addr === 'string' && record.dashboard_addr.length > 0
+        ? record.dashboard_addr
+        : '127.0.0.1';
+    const configPath = this.configPath;
+    return startPanel({
+      addr,
+      port: record.dashboard_port,
+      staticDir: path.join(__dirname, 'panel'),
+      authorize: (header) => {
+        const current = readConfigFile(configPath);
+        const cfg = current && typeof current === 'object' ? (current as Record<string, unknown>) : {};
+        return checkBasicAuth(header, cfg.dashboard_user, cfg.dashboard_pwd);
+      },
+      handlers: {
+        role: 'client',
+        getConfig: () => readConfigFile(configPath),
+        putConfig: (patch) => updateClientFile(configPath, patch),
+        addProxy: (entry) => addClientProxyFile(configPath, entry),
+      },
+    }).then((started) => {
+      this.panelClose = started.close;
+      log.info(`panel listening on http://${addr}:${started.port}/`);
+      return started.port;
+    });
   }
 
   private clearReconnectTimer() {
@@ -253,4 +299,12 @@ export class NrpClient {
       }
     });
   }
+}
+
+export async function startClientFromConfigFile(configPath: string) {
+  const absolute = path.resolve(configPath);
+  const config = readConfigFile(absolute) as ClientSettings;
+  const client = new NrpClient(config, absolute);
+  const dashboardPort = await client.start();
+  return { client, dashboardPort };
 }

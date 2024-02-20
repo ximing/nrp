@@ -35,7 +35,8 @@ node packages/client/dist/bin.js -c app/demo/nrpc.yaml
 | `packages/shared` | 帧格式、按连接重组、配置校验、重连延迟、stream id |
 | `packages/server` | 服务端 `nrps`：控制端口、客户端登记、虚拟主机 HTTP |
 | `packages/client` | 客户端 `nrpc`：连接、心跳、重连、转发到本机端口 |
-| `packages/dashboard`、`packages/web` | 控制台页面和托管进程，不参与上面的转发链路 |
+| `packages/panel` | 服务端和客户端共用的 React + TypeScript 控制面板，用 shadcn/ui 和 Tailwind 构建。`nrps` / `nrpc` 构建时把它的静态文件拷进自己的 `dist/panel` |
+| `packages/dashboard`、`packages/web` | 旧的控制台页面和托管进程，命令行不再用它提供面板 |
 | `app/demo` | 示例 HTTP 服务，以及一对 `nrps.yaml` / `nrpc.yaml` |
 | `tests` | 帧边界、密钥与配置、重连、空闲超时和 stream id |
 | `docs/config.md` | 配置字段表 |

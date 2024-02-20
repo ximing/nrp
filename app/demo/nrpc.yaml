@@ -2,6 +2,10 @@ bind_port: 9000 # FRP 服务监听的端口
 bind_host: 127.0.0.1 # FRP 服务监听的端口
 subdomain_host: delu.life:9001 # 你拥有的域名，用于子域名访问
 secret: nrp-demo
+dashboard_addr: 127.0.0.1
+dashboard_port: 7501
+dashboard_user: admin
+dashboard_pwd: nrp-demo
 timeout: 1000
 retry: 3
 backoff:

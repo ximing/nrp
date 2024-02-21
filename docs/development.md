@@ -19,13 +19,15 @@ pnpm test
 
 `pnpm run build` 清空各包的 `dist`，编译 `packages/*`，再把 `packages/web/dist` 同步到 `packages/dashboard/dist/web`。只编译除 web 以外的包可以用 `pnpm run build:dev`。
 
-`pnpm test` 先编译 `@nrpjs/shared`、`@nrpjs/server` 和 `@nrpjs/client`，再用 Node 自带的测试运行器执行 `tests/*.test.js`。测试通过 `require('@nrpjs/...')` 调用编译后的入口。
+`pnpm test` 先编译 `@nrpjs/panel`、`@nrpjs/shared`、`@nrpjs/server` 和 `@nrpjs/client`，再用 Node 自带的测试运行器执行 `tests/*.test.js`。测试通过 `require('@nrpjs/...')` 调用编译后的入口。
 
 本地还没有全局安装命令时，构建之后可以直接运行：
 
 ```bash
 node packages/server/dist/bin.js -c app/demo/nrps.yaml
 node packages/client/dist/bin.js -c app/demo/nrpc.yaml
+node packages/server/dist/bin.js init
+node packages/client/dist/bin.js init
 ```
 
 ## 目录

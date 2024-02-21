@@ -2,6 +2,8 @@
 
 使用步骤、访问时的 Host，以及一组可以直接复制的配置，写在仓库根目录的 [README](../README.md)。这里只列字段。
 
+也可以在终端运行 `nrps init` 或 `nrpc init`，按提示生成下面的 YAML。`-o` 指定路径，默认是当前目录的 `nrps.yaml` 和 `nrpc.yaml`。目标文件已经存在时，要确认才会覆盖。
+
 ## 服务端 `nrps.yaml`
 
 ```yaml

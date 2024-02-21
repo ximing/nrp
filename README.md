@@ -13,6 +13,30 @@ npm i -g @nrpjs/client
 
 服务端命令是 `nrps`，客户端命令是 `nrpc`。两边都用 `-c` 指定一份 YAML 配置。`-h` 可以查看命令参数。
 
+## 初始化配置
+
+不想手写 YAML 时，在终端里运行：
+
+```bash
+nrps init
+nrpc init
+```
+
+这是一个全屏表单。方向键移动，回车开始编辑，再按回车确认，Esc 放弃这一格。在「保存」上按回车写入。没有正在编辑时按 Esc 会取消，并且不创建文件。
+
+`nrps init` 会询问控制端口、HTTP 端口、共享密钥、空闲超时，以及要不要启用控制面板。`nrpc init` 接着确认要公布的 HTTP 代理。列表里预先放了一条 `web` / `app` / `3000`，可以改、用 `x` 删除，或再添加。没有代理时不会写入。
+
+默认写到当前目录的 `nrps.yaml` 和 `nrpc.yaml`。换路径：
+
+```bash
+nrps init -o /etc/nrp/nrps.yaml
+nrpc init -o nrpc.yaml
+```
+
+路径也可以在表单最后一行修改。文件已经存在时，会问是否覆盖，光标默认停在「否」。
+
+`init` 需要在终端里运行。写完后按提示启动，例如 `nrps -c nrps.yaml`。
+
 ## 启动服务端
 
 在能被客户端和访问者连到的机器上保存 `nrps.yaml`：
